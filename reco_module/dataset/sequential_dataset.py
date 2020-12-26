@@ -49,16 +49,16 @@ class BookingSequenceDataModule(pl.LightningDataModule):
         def from_df_to_sequence(sub_df):
             per_trip = sub_df.groupby(df.utrip_id). \
                 agg({"city_id": list})
-            city_lists = per_trip["city_id"].apply(lambda x: (x[:-1], x[-1]))
-
-            return list(city_lists.itertuples(index=True))
+            per_trip["city_id"] = per_trip["city_id"].apply(lambda x: (x[:-1], x[-1]))
+            return list(per_trip.itertuples(index=False))
 
         self.train_set = list(from_df_to_sequence(df[df.user_id.isin(train_users)]))
         self.valid_set = list(from_df_to_sequence(df[df.user_id.isin(valid_users)]))
 
     def build_sequence_tensor(self, sequences):
+        sequences = list(map(lambda x: x.city_id, sequences))
         xs, ys = zip(*sequences)
-        X = pad_sequence(list(map(torch.LongTensor, xs)), padding_value=-1)
+        X = pad_sequence(list(map(torch.LongTensor, xs)), padding_value=-1).transpose(1, 0)
         return X, torch.LongTensor(ys)
 
     def train_dataloader(self):
