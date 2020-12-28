@@ -11,19 +11,21 @@ class TestKnnLearner(TestCase):
     @classmethod
     def setUpClass(cls):
         cls.n_items = 38020
-        cls.embedding_size = 10
+        cls.embedding_size = 50
         THIS_DIR = os.path.dirname(os.path.abspath(__file__))
-        cls.test_data = os.path.join(THIS_DIR, "example.ckpt")
+        cls.test_data = os.path.join(THIS_DIR, "model.chkpt")
 
     def setUp(self):
-        self.model = KnnLearner(self.n_items, embedding_size=self.embedding_size, weight_path=self.test_data)
+        self.model = KnnLearner(self.n_items, embedding_size=self.embedding_size, city_weight_path=self.test_data)
 
     def test_forward(self):
-        self.model.forward([[1, 2, 3], [1, 2]],
-                           torch.LongTensor([1, 5, 9, 0]))
+        x = [torch.LongTensor([1, 2, 3]), torch.LongTensor([1, 2])]
+        sizes = torch.FloatTensor([3, 2])
+        self.model.forward(x, sizes)
 
     def test_train_step(self):
-        x = [[1, 2, 3]]
-        y = [0]
-        self.model.training_step((x, y), 0)
+        x = [torch.LongTensor([1, 2, 3])]
+        y = torch.LongTensor([0])
+        sizes = torch.FloatTensor([3])
+        self.model.training_step(((x, sizes), y), 0)
 

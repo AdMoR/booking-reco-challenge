@@ -10,7 +10,7 @@ This code aims at solving the 2020 booking challenge on next booking location pr
 
 The system learns in two steps : 
 
-- Learn matric factorization embeddings for id like features : city_id, country_id
+- Learn matrix factorization embeddings for id like features : city_id, country_id
 - Combine these feature learned in a fully connected neural net for a multi class classification problem.
 
 

@@ -22,11 +22,9 @@ class BookingSequenceDataModule(pl.LightningDataModule):
         """
         We use pandas to store the data
 
-        1 - We extract te positive pair of co-occurance of cities among user trips
-        2 - Based on the pos pairs, we generate negative example with a neg to pos ratio = 5
-        3 - We format this to Nx2 and Nx1 vectors
+        Context data is stored as list of lists
         """
-        df = pd.read_csv(os.path.join(self.data_dir, "booking_train_set.csv"), nrows=999999)
+        df = pd.read_csv(os.path.join(self.data_dir, "booking_train_set.csv"))
 
         # Some indexes may be missing, we need to reindex
         self.nb_cities = len(set(df.city_id))
@@ -71,7 +69,8 @@ class BookingSequenceDataModule(pl.LightningDataModule):
 
     def train_dataloader(self):
         X, Y = self.build_sequence_tensor(self.train_set)
-        return DataLoader(Dataset(X, Y), collate_fn=self.my_collate, batch_size=self.batch_size, shuffle=True, num_workers=4)
+        return DataLoader(Dataset(X, Y), collate_fn=self.my_collate, batch_size=self.batch_size,
+                          shuffle=True, num_workers=0)
 
     def val_dataloader(self):
         X, Y = self.build_sequence_tensor(self.valid_set)

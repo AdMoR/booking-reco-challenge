@@ -37,7 +37,7 @@ class BookingTripRecoDataModule(pl.LightningDataModule):
         2 - Based on the pos pairs, we generate negative example with a neg to pos ratio = 5
         3 - We format this to Nx2 and Nx1 vectors
         """
-        df = pd.read_csv(os.path.join(self.data_dir, "booking_train_set.csv"), nrows=999999)
+        df = pd.read_csv(os.path.join(self.data_dir, "booking_train_set.csv"))
 
         # Some indexes may be missing, we need to reindex
         self.nb_cities = len(set(df.city_id))
