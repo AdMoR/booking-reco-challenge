@@ -8,7 +8,9 @@ class MatrixFactorization(pl.LightningModule):
     def __init__(self, n_items, lr=1e-3, embedding_size=50):
         super().__init__()
         self.lr = lr
-        self.embeddings = nn.Embedding(n_items, embedding_size)
+        self.n_items = n_items
+        # We add an additional dim to allow to query efficiently variable size user history
+        self.embeddings = nn.Embedding(self.n_items + 1, embedding_size, padding_idx=-1)
         self.sim = nn.CosineSimilarity(dim=1, eps=1e-6)
         
     def forward(self, x):

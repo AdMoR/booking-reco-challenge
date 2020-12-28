@@ -47,10 +47,12 @@ class BookingSequenceDataModule(pl.LightningDataModule):
         valid_users = users.difference(set(train_users))
 
         def from_df_to_sequence(sub_df):
+            sub_df["city_id"] = sub_df["city_id"].apply(lambda x: self.cities_to_index[x])
             per_trip = sub_df.groupby(df.utrip_id). \
                 agg({"city_id": list})
             per_trip["city_id"] = per_trip["city_id"].apply(lambda x: (x[:-1], x[-1]))
-            return list(per_trip.itertuples(index=False))
+            return list(filter(lambda x: len(x.city_id[0]) >= 1,
+                               per_trip.itertuples(index=False)))
 
         self.train_set = list(from_df_to_sequence(df[df.user_id.isin(train_users)]))
         self.valid_set = list(from_df_to_sequence(df[df.user_id.isin(valid_users)]))
@@ -58,16 +60,22 @@ class BookingSequenceDataModule(pl.LightningDataModule):
     def build_sequence_tensor(self, sequences):
         sequences = list(map(lambda x: x.city_id, sequences))
         xs, ys = zip(*sequences)
-        X = pad_sequence(list(map(torch.LongTensor, xs)), padding_value=-1).transpose(1, 0)
-        return X, torch.LongTensor(ys)
+        return xs, ys
+
+    def my_collate(self, batch):
+        data = [torch.LongTensor(item[0]) for item in batch]
+        sizes = [len(item[0]) for item in batch]
+        target = [item[1] for item in batch]
+        target = torch.LongTensor(target)
+        return [(data, sizes), target]
 
     def train_dataloader(self):
         X, Y = self.build_sequence_tensor(self.train_set)
-        return DataLoader(Dataset(X, Y), batch_size=self.batch_size, shuffle=True)
+        return DataLoader(Dataset(X, Y), collate_fn=self.my_collate, batch_size=self.batch_size, shuffle=True, num_workers=4)
 
     def val_dataloader(self):
         X, Y = self.build_sequence_tensor(self.valid_set)
-        return DataLoader(Dataset(X, Y), batch_size=self.batch_size, shuffle=True)
+        return DataLoader(Dataset(X, Y), collate_fn=self.my_collate, batch_size=self.batch_size, shuffle=True)
 
     def test_dataloader(self):
         return self.val_dataloader()
