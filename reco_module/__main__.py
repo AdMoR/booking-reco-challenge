@@ -9,7 +9,7 @@ from .dataset.reco_dataset import BookingTripRecoDataModule
 from .dataset.sequential_dataset import BookingSequenceDataModule
 
 
-def main(max_epochs=20, embedding_size=50, lr=1e-3, save_path="./my_new_mf_model.chkpt"):
+def main(max_epochs=20, embedding_size=50, lr=1e-3, save_path="./my_mf_model.chkpt"):
 
     dataset = BookingTripRecoDataModule("/Users/a.morvan/Documents/code_dw/booking-reco-challenge/data", 256)
     dataset.setup()
@@ -27,13 +27,11 @@ def main(max_epochs=20, embedding_size=50, lr=1e-3, save_path="./my_new_mf_model
 
         new_trainer.fit(mf, dl)
         new_trainer.test(mf, dl)
-
-        save_path = "./my_mf_model.chkpt"
         new_trainer.save_checkpoint(save_path)
 
-    sequence_dataset = BookingSequenceDataModule("/Users/a.morvan/Documents/code_dw/booking-reco-challenge/data", 256)
+    sequence_dataset = BookingSequenceDataModule("/Users/a.morvan/Documents/code_dw/booking-reco-challenge/data", 1024)
     sequence_dataset.setup()
-    knn_learner = KnnLearner(dataset.nb_cities, embedding_size, save_path, lr)
+    knn_learner = KnnLearner(dataset.nb_cities, save_path, embedding_size, lr)
 
     logger = TensorBoardLogger("tb_logs", name="sequence_model")
     trainer = pl.Trainer(max_epochs=max_epochs, progress_bar_refresh_rate=20,

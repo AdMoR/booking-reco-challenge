@@ -1,4 +1,5 @@
 import os
+from argparse import ArgumentParser
 import itertools
 import torch
 from torch import nn
@@ -13,16 +14,22 @@ from reco_module.mf.mf_learner import MatrixFactorization
 
 class KnnLearner(pl.LightningModule):
 
-    def __init__(self, n_items, embedding_size=50, city_weight_path=None, lr=1e-4):
+    def __init__(self, n_items, city_weight_path, embedding_size=50, lr=1e-4, layer_size=(20, 10), *args, **kwargs):
         super().__init__()
+        self.save_hyperparameters()
         print("Params : ", n_items, embedding_size, city_weight_path)
         self.lr = lr
         self.embeddings_model = MatrixFactorization.\
-            load_from_checkpoint(checkpoint_path=city_weight_path, n_items=n_items, lr=lr, embedding_size=embedding_size)
+            load_from_checkpoint(checkpoint_path=city_weight_path, n_items=n_items,
+                                 lr=self.lr, embedding_size=embedding_size)
         self.n_items = n_items
 
-        self.user_tower = nn.Sequential(*[nn.Linear(embedding_size, 20), nn.ReLU(), nn.Linear(20, 10)])
-        self.item_tower = nn.Sequential(*[nn.Linear(embedding_size, 20), nn.ReLU(), nn.Linear(20, 10)])
+        self.user_tower = nn.Sequential(*[nn.Linear(embedding_size, layer_size[0]),
+                                          nn.ReLU(),
+                                          nn.Linear(layer_size[0], layer_size[1])])
+        self.item_tower = nn.Sequential(*[nn.Linear(embedding_size, layer_size[0]),
+                                          nn.ReLU(),
+                                          nn.Linear(layer_size[0], layer_size[1])])
 
     def forward(self, xs_user, sizes):
         """

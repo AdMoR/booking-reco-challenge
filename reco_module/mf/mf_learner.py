@@ -1,12 +1,14 @@
 import torch
 from torch import nn
 import pytorch_lightning as pl
+from argparse import ArgumentParser
 
 
 class MatrixFactorization(pl.LightningModule):
 
-    def __init__(self, n_items, lr=1e-3, embedding_size=50):
+    def __init__(self, n_items, lr=1e-3, embedding_size=50, *args, **kwargs):
         super().__init__()
+        self.save_hyperparameters()
         self.lr = lr
         self.n_items = n_items
         # We add an additional dim to allow to query efficiently variable size user history
