@@ -3,6 +3,7 @@ import pytorch_lightning as pl
 from pytorch_lightning.loggers import TensorBoardLogger
 
 from .utils.embedding_callback import EmbeddingLoggerCallBack
+from .utils.dummy_reco import MaxCoocModel
 from .mf.mf_learner import MatrixFactorization
 from .mf.knn_learner import KnnLearner
 from .dataset.reco_dataset import BookingTripRecoDataModule
@@ -29,9 +30,10 @@ def main(max_epochs=20, embedding_size=50, lr=1e-3, save_path="./my_mf_model.chk
         new_trainer.test(mf, dl)
         new_trainer.save_checkpoint(save_path)
 
+    dummy_model = MaxCoocModel("/Users/a.morvan/Documents/code_dw/booking-reco-challenge/data/booking_train_set.csv")
     sequence_dataset = BookingSequenceDataModule("/Users/a.morvan/Documents/code_dw/booking-reco-challenge/data", 1024)
     sequence_dataset.setup()
-    knn_learner = KnnLearner(dataset.nb_cities, save_path, embedding_size, lr)
+    knn_learner = KnnLearner(dataset.nb_cities, save_path, embedding_size, lr, dummy_model=dummy_model)
 
     logger = TensorBoardLogger("tb_logs", name="sequence_model")
     trainer = pl.Trainer(max_epochs=max_epochs, progress_bar_refresh_rate=20,

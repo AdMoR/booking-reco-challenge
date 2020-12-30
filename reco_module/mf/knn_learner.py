@@ -10,11 +10,13 @@ from torch.nn.utils.rnn import pad_sequence, pack_sequence
 import pytorch_lightning as pl
 
 from reco_module.mf.mf_learner import MatrixFactorization
+from reco_module.utils.dummy_reco import MaxCoocModel
 
 
 class KnnLearner(pl.LightningModule):
 
-    def __init__(self, n_items, city_weight_path, embedding_size=50, lr=1e-4, layer_size=(20, 10), *args, **kwargs):
+    def __init__(self, n_items, city_weight_path, embedding_size=50, lr=1e-4, layer_size=(20, 10),
+                 dummy_model=None, *args, **kwargs):
         super().__init__()
         self.save_hyperparameters()
         print("Params : ", n_items, embedding_size, city_weight_path)
@@ -31,11 +33,13 @@ class KnnLearner(pl.LightningModule):
                                           nn.ReLU(),
                                           nn.Linear(layer_size[0], layer_size[1])])
 
+        self.dummy_model = dummy_model
+
     def forward(self, xs_user, sizes):
         """
 
         :param xs_user: list of list -> each list represent the item_id of a user
-        :params sizes: list(int) size of each list before padding
+        :param sizes: list(int) size of each list before padding
         :return:
         """
         # During the training, we will look for the dot product btw user vector and all item vectors
@@ -69,6 +73,12 @@ class KnnLearner(pl.LightningModule):
         self.log('loss', loss)
         topk_matches = torch.sum(torch.topk(scores, k=4, dim=1).indices == y.reshape(-1, 1))
         self.log('top_k matches', topk_matches / y.shape[0])
+
+        if self.dummy_model:
+            my_batch = [v[-1] for v in x]
+            dummy_scores = torch.Tensor(self.dummy_model.batch_scores(my_batch))
+            topk_matches = torch.sum(torch.topk(dummy_scores, k=4, dim=1).indices == y.reshape(-1, 1))
+            self.log('top_k matches for dummy', topk_matches / y.shape[0])
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -79,7 +89,6 @@ class KnnLearner(pl.LightningModule):
     def test_step(self, batch, batch_idx):
         loss = self.training_step(batch, batch_idx)
         self.log('test_loss', loss)
-        # --------------------------
 
     def configure_optimizers(self):
         parameters = itertools.chain(
