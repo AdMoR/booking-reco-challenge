@@ -16,7 +16,7 @@ from reco_module.utils.dummy_reco import MaxCoocModel
 class KnnLearner(pl.LightningModule):
 
     def __init__(self, n_items, city_weight_path, embedding_size=50, lr=1e-4, layer_size=(20, 10),
-                 dummy_model=None, *args, **kwargs):
+                 dummy_model=None, multiplier=2, *args, **kwargs):
         super().__init__()
         self.save_hyperparameters()
         print("Params : ", n_items, embedding_size, city_weight_path)
@@ -26,20 +26,19 @@ class KnnLearner(pl.LightningModule):
                                  lr=self.lr, embedding_size=embedding_size)
         self.n_items = n_items
 
-        self.user_tower = nn.Sequential(*[nn.Linear(embedding_size, layer_size[0]),
+        self.user_tower = nn.Sequential(*[nn.Linear(multiplier * embedding_size, layer_size[0]),
                                           nn.ReLU(),
                                           nn.Linear(layer_size[0], layer_size[1])])
         self.item_tower = nn.Sequential(*[nn.Linear(embedding_size, layer_size[0]),
                                           nn.ReLU(),
                                           nn.Linear(layer_size[0], layer_size[1])])
-
         self.dummy_model = dummy_model
 
-    def forward(self, xs_user, sizes):
+    def forward(self, xs_user, sizes, last_city=None):
         """
-
         :param xs_user: list of list -> each list represent the item_id of a user
         :param sizes: list(int) size of each list before padding
+        :param last_city: Tensor([city_ids]) contains the last city of the user for each current trip
         :return:
         """
         # During the training, we will look for the dot product btw user vector and all item vectors
@@ -50,10 +49,14 @@ class KnnLearner(pl.LightningModule):
         seq_sizes = torch.FloatTensor(sizes)
         X = pad_sequence(xs_user, batch_first=False, padding_value=self.n_items)
         user_embeddings = self.embeddings_model.embeddings(X)
-        user_features = self.user_tower(user_embeddings)
+        user_batch = torch.sum(user_embeddings, dim=0) / seq_sizes.reshape(-1, 1)
 
-        user_batch = torch.sum(user_features, dim=0) / seq_sizes.reshape(-1, 1)
-        scores = user_batch @ self.final_item_embeddings.transpose(1, 0)
+        if last_city is not None:
+            last_city_embeddings = self.embeddings_model.embeddings(last_city)
+            user_batch = torch.cat([user_batch, last_city_embeddings], dim=1)
+
+        user_features = self.user_tower(user_batch)
+        scores = user_features @ self.final_item_embeddings.transpose(1, 0)
 
         return scores
 
@@ -67,7 +70,7 @@ class KnnLearner(pl.LightningModule):
             return -(w * elmt_wise_loss).sum() / w.sum()
 
     def training_step(self, batch, batch_idx):
-        (x, sizes), y = batch
+        (x, sizes, last_city), y = batch
         scores = self.forward(x, sizes)
         loss = self.weighted_cross_entropy(F.softmax(scores, dim=1), torch.LongTensor(y))
         self.log('loss', loss)

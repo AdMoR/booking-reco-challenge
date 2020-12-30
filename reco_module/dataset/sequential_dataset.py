@@ -63,9 +63,10 @@ class BookingSequenceDataModule(pl.LightningDataModule):
     def my_collate(self, batch):
         data = [torch.LongTensor(item[0]) for item in batch]
         sizes = [len(item[0]) for item in batch]
+        last_city = torch.LongTensor([item[0][-1] for item in batch])
         target = [item[1] for item in batch]
         target = torch.LongTensor(target)
-        return [(data, sizes), target]
+        return [(data, sizes, last_city), target]
 
     def train_dataloader(self):
         X, Y = self.build_sequence_tensor(self.train_set)
