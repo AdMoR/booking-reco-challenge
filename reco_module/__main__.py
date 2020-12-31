@@ -10,7 +10,7 @@ from .dataset.reco_dataset import BookingTripRecoDataModule
 from .dataset.sequential_dataset import BookingSequenceDataModule
 
 
-def main(max_epochs=20, embedding_size=50, lr=1e-3, save_path="./my_mf_model.chkpt"):
+def main(max_epochs=1, embedding_size=50, lr=1e-3, save_path="./my_mf_model.chkpt"):
 
     dataset = BookingTripRecoDataModule("/Users/a.morvan/Documents/code_dw/booking-reco-challenge/data", 256)
     dataset.setup()

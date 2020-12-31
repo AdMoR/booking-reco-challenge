@@ -55,6 +55,7 @@ class KnnLearner(pl.LightningModule):
             last_city_embeddings = self.embeddings_model.embeddings(last_city)
             user_batch = torch.cat([user_batch, last_city_embeddings], dim=1)
 
+        print(user_batch.shape, last_city)
         user_features = self.user_tower(user_batch)
         scores = user_features @ self.final_item_embeddings.transpose(1, 0)
 
@@ -71,7 +72,7 @@ class KnnLearner(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
         (x, sizes, last_city), y = batch
-        scores = self.forward(x, sizes)
+        scores = self.forward(x, sizes, last_city)
         loss = self.weighted_cross_entropy(F.softmax(scores, dim=1), torch.LongTensor(y))
         self.log('loss', loss)
         topk_matches = torch.sum(torch.topk(scores, k=4, dim=1).indices == y.reshape(-1, 1))

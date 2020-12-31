@@ -8,7 +8,7 @@ class MaxCoocModel:
 
     def __init__(self, data_path):
 
-        df = pd.read_csv(data_path, nrows=10000)
+        df = pd.read_csv(data_path)
         self.index_to_cities = dict(enumerate(set(df.city_id)))
         self.cities_to_index = {v: k for k, v in self.index_to_cities.items()}
 
