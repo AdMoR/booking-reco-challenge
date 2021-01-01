@@ -32,5 +32,4 @@ class TestSequenceDataset(TestCase):
         ds = self.dataset.train_dataloader()
 
         for elem in ds.dataset:
-            print(elem)
             assert len(elem[0]) > 0

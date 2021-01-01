@@ -10,16 +10,17 @@ from pytorch_lightning.loggers import TensorBoardLogger
 
 
 class Dataset(torch.utils.data.Dataset):
-    def __init__(self, a, b):
-        assert len(a) == len(b)
-        self.a = a
-        self.b = b
+    def __init__(self, *args):
+        self.tensors = args
+        length = len(self.tensors[0])
+        if not all([len(t) == length for t in self.tensors]):
+            raise Exception(f"Tensor do not have all the same size : {[len(t) for t in self.tensors]}")
 
     def __len__(self):
-        return len(self.a)
+        return len(self.tensors[0])
 
     def __getitem__(self, i):
-        return self.a[i], self.b[i]
+        return [t[i] for t in self.tensors]
 
 
 class BookingTripRecoDataModule(pl.LightningDataModule):
