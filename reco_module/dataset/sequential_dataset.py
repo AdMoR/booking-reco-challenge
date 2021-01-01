@@ -55,13 +55,16 @@ class BookingSequenceDataModule(pl.LightningDataModule):
     def build_df_features(self, df):
         df["city_id"] = df["city_id"].apply(lambda x: self.cities_to_index[x])
 
-    def build_trip_features(self, df):
+    @staticmethod
+    def build_trip_features(df):
+
         def get_non_label(grouped_x):
             data = list(grouped_x.values)
             if len(grouped_x.values) < 2:
                 return [-1]
             else:
                 return data[:-1]
+
         def get_booking_month(grouped_x):
             data = grouped_x.values
             if len(grouped_x.values) < 2:
@@ -112,8 +115,9 @@ class BookingSequenceDataModule(pl.LightningDataModule):
                           shuffle=True, num_workers=0)
 
     def val_dataloader(self):
-        X, Y = self.build_sequence_tensor(self.valid_set)
-        return DataLoader(Dataset(X, Y), collate_fn=self.my_collate, batch_size=self.batch_size, shuffle=True)
+        X, Y, *other_features = self.build_sequence_tensor(self.valid_set)
+        return DataLoader(Dataset(X, Y, *other_features), collate_fn=self.my_collate, batch_size=self.batch_size,
+                          shuffle=True)
 
     def test_dataloader(self):
         return self.val_dataloader()
