@@ -16,7 +16,7 @@ from reco_module.utils.dummy_reco import MaxCoocModel
 class KnnLearner(pl.LightningModule):
 
     def __init__(self, n_items, city_weight_path, embedding_size=50, lr=1e-4, layer_size=(20, 10),
-                 dummy_model=None, multiplier=2, n_affiliates=3064, emb_aff_size=10, n_dates=12, emb_date_size=2,
+                 dummy_model=None, multiplier=2, n_affiliates=3065, emb_aff_size=10, n_dates=13, emb_date_size=2,
                  *args, **kwargs):
         super().__init__()
         self.save_hyperparameters()
@@ -66,7 +66,6 @@ class KnnLearner(pl.LightningModule):
         if date_month is not None:
             date_embedding = self.date_embedding(date_month)
             user_batch = torch.cat([user_batch, date_embedding], dim=1)
-
 
         user_features = self.user_tower(user_batch)
         scores = user_features @ final_item_embeddings.transpose(1, 0)

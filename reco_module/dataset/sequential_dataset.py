@@ -30,6 +30,8 @@ class BookingSequenceDataModule(pl.LightningDataModule):
         self.nb_cities = len(set(df.city_id))
         self.index_to_cities = dict(enumerate(set(df.city_id)))
         self.cities_to_index = {v: k for k, v in self.index_to_cities.items()}
+        self.index_to_affiliates = dict(enumerate(set(df.affiliate_id)))
+        self.affiliate_to_index = {v: k for k, v in self.index_to_affiliates.items()}
         country_per_city_tuples = dict(df.groupby(df.city_id).\
                                        agg({"hotel_country": "unique"}).\
                                        itertuples(index=True))
@@ -54,6 +56,7 @@ class BookingSequenceDataModule(pl.LightningDataModule):
 
     def build_df_features(self, df):
         df["city_id"] = df["city_id"].apply(lambda x: self.cities_to_index[x])
+        df["affiliate_id"] = df["affiliate_id"].apply(lambda x: self.affiliate_to_index[x])
 
     @staticmethod
     def build_trip_features(df):
