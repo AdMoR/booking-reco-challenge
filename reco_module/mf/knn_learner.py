@@ -117,6 +117,8 @@ class KnnLearner(pl.LightningModule):
             self.embeddings_model.embeddings.parameters(),
             self.user_tower.parameters(),
             self.item_tower.parameters(),
+            self.affiliate_embedding.parameters(),
+            self.date_embedding.parameters()
         )
         optimizer = torch.optim.Adam(parameters, lr=self.lr, weight_decay=1e-5)
         return optimizer
