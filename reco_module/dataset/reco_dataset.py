@@ -25,10 +25,11 @@ class Dataset(torch.utils.data.Dataset):
 
 class BookingTripRecoDataModule(pl.LightningDataModule):
 
-    def __init__(self, data_dir: str, batch_size: int):
+    def __init__(self, data_dir: str, batch_size: int, country_mode: bool = False):
         super().__init__()
         self.data_dir = data_dir
         self.batch_size = batch_size
+        self.country_mode = country_mode
 
     def setup(self, stage=None):
         """
@@ -42,41 +43,58 @@ class BookingTripRecoDataModule(pl.LightningDataModule):
 
         # Some indexes may be missing, we need to reindex
         self.nb_cities = len(set(df.city_id))
+        self.nb_countries = len(set(df.hotel_country))
         self.index_to_cities = dict(enumerate(set(df.city_id)))
         self.cities_to_index = {v: k for k, v in self.index_to_cities.items()}
-
-        # Additional infos
+        self.index_to_country = dict(enumerate(set(df.hotel_country)))
+        self.country_to_index = {v: k for k, v in self.index_to_country.items()}
         country_per_city_tuples = dict(df.groupby(df.city_id).agg({"hotel_country": "unique"}). \
                                        itertuples(index=True))
         self.city_to_country = dict(map(lambda p: (p[0], p[1][0]), country_per_city_tuples.items()))
 
         # Now we do a split of the training set based user_ids
-        users = set(df.user_id.values)
-        nb_users = len(users)
-        train_nb_users = int(0.9 * nb_users)
-        print(f"Picking {train_nb_users} out of {nb_users}")
-        train_users = np.random.choice(np.array(list(users)).flatten(), train_nb_users, replace=False)
-        valid_users = users.difference(set(train_users))
+        train_users, valid_users = self.build_train_val_split(df)
 
-        # Next we emit positive coocuring pairs
+        self.train_df = df[df.user_id.isin(train_users)]
+        self.valid_df = df[df.user_id.isin(valid_users)]
+
+    def build_cooc_func(self):
         def from_user_list_to_cooc_pairs(sub_df):
             per_trip = sub_df.groupby(sub_df.utrip_id). \
                 agg({"city_id": "unique", "user_id": "count", "hotel_country": "unique"})
 
-            per_trip["nb_countries"] = per_trip["hotel_country"].apply(len)
-            per_trip["nb_cities"] = per_trip["city_id"].apply(len)
-
-            def emit_pairs(cities):
-                sorted_cities = sorted(map(lambda x: self.cities_to_index[x], cities))
-                for i in range(len(cities)):
-                    for j in range(i + 1, len(cities)):
+            def emit_pairs(indexes):
+                conversion_dict = self.cities_to_index if not self.country_mode else self.country_to_index
+                sorted_cities = sorted(map(lambda x: conversion_dict[x], indexes))
+                for i in range(len(indexes)):
+                    for j in range(i + 1, len(indexes)):
                         yield (sorted_cities[i], sorted_cities[j])
 
-            co_cities = per_trip["city_id"]
-            return list(itertools.chain.from_iterable(map(emit_pairs, co_cities)))
+            if not self.country_mode:
+                coocs = per_trip["city_id"]
+            else:
+                coocs = per_trip["hotel_country"]
+            return list(itertools.chain.from_iterable(map(emit_pairs, coocs)))
+        return from_user_list_to_cooc_pairs
 
-        self.train_set_pairs = list(from_user_list_to_cooc_pairs(df[df.user_id.isin(train_users)]))
-        self.valid_set_pairs = list(from_user_list_to_cooc_pairs(df[df.user_id.isin(valid_users)]))
+    @property
+    def train_set_pairs(self):
+        from_user_list_to_cooc_pairs = self.build_cooc_func()
+        return list(from_user_list_to_cooc_pairs(self.train_df))
+
+    @property
+    def valid_set_pairs(self):
+        from_user_list_to_cooc_pairs = self.build_cooc_func()
+        return list(from_user_list_to_cooc_pairs(self.valid_df))
+
+    def build_train_val_split(self, df, percent=0.9):
+        users = set(df.user_id.values)
+        nb_users = len(users)
+        train_nb_users = int(percent * nb_users)
+        print(f"Picking {train_nb_users} out of {nb_users}")
+        train_users = np.random.choice(np.array(list(users)).flatten(), train_nb_users, replace=False)
+        valid_users = users.difference(set(train_users))
+        return train_users, valid_users
 
     def build_neg_pairs(self, pos_pairs, n_classes, neg_rate=5):
 
@@ -96,8 +114,6 @@ class BookingTripRecoDataModule(pl.LightningDataModule):
 
         neg_pairs = [sample_neg_pair() for _ in range(neg_rate * total_pos_pairs)]
 
-        print("---> ", np.array(pos_pairs).shape, len(pos_pairs))
-
         xs, ys = zip(*pair_counter.items())
 
         X_pos = np.array(xs).reshape((-1, 2))
@@ -112,11 +128,13 @@ class BookingTripRecoDataModule(pl.LightningDataModule):
         return X, Y
 
     def train_dataloader(self):
-        X, Y = self.build_neg_pairs(self.train_set_pairs, self.nb_cities)
+        n_classes = self.nb_cities if not self.country_mode else self.nb_countries
+        X, Y = self.build_neg_pairs(self.train_set_pairs, n_classes)
         return DataLoader(Dataset(X, Y), batch_size=self.batch_size, shuffle=True)
 
     def val_dataloader(self):
-        X, Y = self.build_neg_pairs(self.valid_set_pairs, self.nb_cities)
+        n_classes = self.nb_cities if not self.country_mode else self.nb_countries
+        X, Y = self.build_neg_pairs(self.valid_set_pairs, n_classes)
         return DataLoader(Dataset(X, Y), batch_size=self.batch_size, shuffle=True)
 
     def test_dataloader(self):

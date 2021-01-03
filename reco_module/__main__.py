@@ -10,12 +10,13 @@ from .dataset.reco_dataset import BookingTripRecoDataModule
 from .dataset.sequential_dataset import BookingSequenceDataModule
 
 
-def main(max_epochs=1, embedding_size=50, lr=1e-3, save_path="./my_mf_model.chkpt"):
+def main(max_epochs=1, embedding_size=50, lr=1e-3, city_save_path="./my_city_mf_model.chkpt",
+         country_save_path="./my_country_mf_model"):
 
     dataset = BookingTripRecoDataModule("/Users/a.morvan/Documents/code_dw/booking-reco-challenge/data", 256)
     dataset.setup()
 
-    if not os.path.exists(save_path):
+    if not os.path.exists(city_save_path):
 
         dl = dataset.train_dataloader()
         logger = TensorBoardLogger("tb_logs", name="mf_model")
@@ -28,7 +29,23 @@ def main(max_epochs=1, embedding_size=50, lr=1e-3, save_path="./my_mf_model.chkp
 
         new_trainer.fit(mf, dl)
         new_trainer.test(mf, dl)
-        new_trainer.save_checkpoint(save_path)
+        new_trainer.save_checkpoint(city_save_path)
+
+    if not os.path.exists(country_save_path):
+        dataset.country_mode = True
+        dl = dataset.train_dataloader()
+        logger = TensorBoardLogger("tb_logs", name="mf2_model")
+        new_trainer = pl.Trainer(max_epochs=max_epochs, progress_bar_refresh_rate=20,
+                                 check_val_every_n_epoch=1, logger=logger,
+                                 val_check_interval=0.25,
+                                 callbacks=[EmbeddingLoggerCallBack(list(dataset.index_to_country.values()))])
+
+        mf = MatrixFactorization(dataset.nb_countries, lr, int(embedding_size / 2))
+
+        new_trainer.fit(mf, dl)
+        new_trainer.test(mf, dl)
+        new_trainer.save_checkpoint(city_save_path)
+
 
     dummy_model = MaxCoocModel("/Users/a.morvan/Documents/code_dw/booking-reco-challenge/data/booking_train_set.csv")
     sequence_dataset = BookingSequenceDataModule("/Users/a.morvan/Documents/code_dw/booking-reco-challenge/data", 1024)
