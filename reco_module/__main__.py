@@ -10,10 +10,11 @@ from .dataset.reco_dataset import BookingTripRecoDataModule
 from .dataset.sequential_dataset import BookingSequenceDataModule
 
 
-def main(max_epochs=1, embedding_size=50, lr=1e-3, city_save_path="./my_city_mf_model.chkpt",
+def main(max_epochs=20, embedding_size=50, lr=1e-3, city_save_path="./my_city_mf_model.chkpt",
          country_save_path="./my_country_mf_model"):
 
-    dataset = BookingTripRecoDataModule("/Users/a.morvan/Documents/code_dw/booking-reco-challenge/data", 256)
+    data_path = "/home/amor/Documents/code_dw/booking_challenge/data"
+    dataset = BookingTripRecoDataModule(data_path, 256)
     dataset.setup()
 
     if not os.path.exists(city_save_path):
@@ -47,10 +48,12 @@ def main(max_epochs=1, embedding_size=50, lr=1e-3, city_save_path="./my_city_mf_
         new_trainer.save_checkpoint(city_save_path)
 
 
-    dummy_model = MaxCoocModel("/Users/a.morvan/Documents/code_dw/booking-reco-challenge/data/booking_train_set.csv")
-    sequence_dataset = BookingSequenceDataModule("/Users/a.morvan/Documents/code_dw/booking-reco-challenge/data", 1024)
+    dummy_model = MaxCoocModel(data_path + "/booking_train_set.csv")
+    sequence_dataset = BookingSequenceDataModule(data_path, 1024)
     sequence_dataset.setup()
-    knn_learner = KnnLearner(dataset.nb_cities, save_path, embedding_size, lr, dummy_model=dummy_model)
+    knn_learner = KnnLearner(dataset.nb_cities, save_path, embedding_size, lr, 
+                             nb_affiliates=len(sequence_dataset.index_to_affiliates), 
+                             dummy_model=dummy_model)
 
     logger = TensorBoardLogger("tb_logs", name="sequence_model")
     trainer = pl.Trainer(max_epochs=max_epochs, progress_bar_refresh_rate=20,

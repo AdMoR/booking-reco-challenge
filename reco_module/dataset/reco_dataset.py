@@ -25,11 +25,12 @@ class Dataset(torch.utils.data.Dataset):
 
 class BookingTripRecoDataModule(pl.LightningDataModule):
 
-    def __init__(self, data_dir: str, batch_size: int, country_mode: bool = False):
+    def __init__(self, data_dir: str, batch_size: int, country_mode: bool = False,  max_rows: int = None):
         super().__init__()
         self.data_dir = data_dir
         self.batch_size = batch_size
         self.country_mode = country_mode
+        self.max_rows = max_rows
 
     def setup(self, stage=None):
         """
@@ -39,7 +40,8 @@ class BookingTripRecoDataModule(pl.LightningDataModule):
         2 - Based on the pos pairs, we generate negative example with a neg to pos ratio = 5
         3 - We format this to Nx2 and Nx1 vectors
         """
-        df = pd.read_csv(os.path.join(self.data_dir, "booking_train_set.csv"))
+        datapath = os.path.join(self.data_dir, "booking_train_set.csv")
+        df = pd.read_csv(datapath) if self.max_rows is None else pd.read_csv(datapath, nrows=self.max_rows)
 
         # Some indexes may be missing, we need to reindex
         self.nb_cities = len(set(df.city_id))

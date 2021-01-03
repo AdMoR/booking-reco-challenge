@@ -21,6 +21,7 @@ class KnnLearner(pl.LightningModule):
         super().__init__()
         self.save_hyperparameters()
         print("Params : ", n_items, embedding_size, city_weight_path)
+        self.n_affiliates = n_affiliates
         self.lr = lr
         self.embeddings_model = MatrixFactorization.\
             load_from_checkpoint(checkpoint_path=city_weight_path, n_items=n_items,
@@ -61,6 +62,7 @@ class KnnLearner(pl.LightningModule):
             last_city_embeddings = self.embeddings_model.embeddings(last_city)
             user_batch = torch.cat([user_batch, last_city_embeddings], dim=1)
         if affiliate_id is not None:
+            print("--->", torch.max(affiliate_id), self.n_affiliates)
             affiliate_id_embedding = self.affiliate_embedding(affiliate_id)
             user_batch = torch.cat([user_batch, affiliate_id_embedding], dim=1)
         if date_month is not None:

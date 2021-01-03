@@ -37,6 +37,8 @@ class TestKnnLearner(TestCase):
         self.model.forward(x, sizes, last_city, dates, affiliate_ids)
 
     def test_train_step(self):
+        self.model = KnnLearner(self.n_items, embedding_size=self.embedding_size, city_weight_path=self.test_data,
+                                multiplier=1, n_affiliates=100)
         x = [torch.LongTensor([1, 2, 3])]
         y = torch.LongTensor([0])
         sizes = torch.FloatTensor([3])

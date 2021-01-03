@@ -13,10 +13,11 @@ from .reco_dataset import Dataset
 
 class BookingSequenceDataModule(pl.LightningDataModule):
 
-    def __init__(self, data_dir: str, batch_size: int):
+    def __init__(self, data_dir: str, batch_size: int, max_rows: int = None):
         super().__init__()
         self.data_dir = data_dir
         self.batch_size = batch_size
+        self.max_rows = max_rows
 
     def setup(self, stage=None):
         """
@@ -24,7 +25,8 @@ class BookingSequenceDataModule(pl.LightningDataModule):
 
         Context data is stored as list of lists
         """
-        df = pd.read_csv(os.path.join(self.data_dir, "booking_train_set.csv"))
+        datapath = os.path.join(self.data_dir, "booking_train_set.csv")
+        df = pd.read_csv(datapath) if self.max_rows is None else pd.read_csv(datapath, nrows=self.max_rows)
 
         # Some indexes may be missing, we need to reindex
         self.nb_cities = len(set(df.city_id))
