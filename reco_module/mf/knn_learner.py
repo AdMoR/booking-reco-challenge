@@ -15,20 +15,25 @@ from reco_module.utils.dummy_reco import MaxCoocModel
 
 class KnnLearner(pl.LightningModule):
 
-    def __init__(self, n_items, city_weight_path, embedding_size=50, lr=1e-4, layer_size=(20, 10),
+    def __init__(self, n_cities, n_countries, city_weight_path, country_weight_path, embedding_size=50, lr=1e-4, layer_size=(20, 10),
                  dummy_model=None, multiplier=2, n_affiliates=3065, emb_aff_size=10, n_dates=13, emb_date_size=2,
                  *args, **kwargs):
         super().__init__()
         self.save_hyperparameters()
-        print("Params : ", n_items, embedding_size, city_weight_path)
+        country_emb_size = int(embedding_size / 2)
+        print("----> Params : ", n_cities, n_countries, city_weight_path, country_weight_path)
         self.n_affiliates = n_affiliates
         self.lr = lr
-        self.embeddings_model = MatrixFactorization.\
-            load_from_checkpoint(checkpoint_path=city_weight_path, n_items=n_items,
-                                 lr=self.lr, embedding_size=embedding_size)
-        self.n_items = n_items
+        self.city_embeddings_model = MatrixFactorization.\
+            load_from_checkpoint(checkpoint_path=city_weight_path, n_items=n_cities,
+                                 lr=self.lr, embedding_size=embedding_size).embeddings
+        self.country_embeddings_model = MatrixFactorization.\
+            load_from_checkpoint(checkpoint_path=country_weight_path, n_items=n_countries,
+                                 lr=self.lr, embedding_size=country_emb_size).embeddings
+        self.n_cities = n_cities
+        self.n_countries = n_countries
 
-        entry_size = embedding_size * multiplier + 0 * emb_aff_size + emb_date_size
+        entry_size = embedding_size * multiplier + 0 * emb_aff_size + emb_date_size + country_emb_size
         self.user_tower = nn.Sequential(*[nn.Linear(entry_size, layer_size[0]),
                                           nn.ReLU(),
                                           nn.Linear(layer_size[0], layer_size[1])])
@@ -39,27 +44,28 @@ class KnnLearner(pl.LightningModule):
         self.affiliate_embedding = nn.Embedding(n_affiliates, emb_aff_size)
         self.date_embedding = nn.Embedding(n_dates, emb_date_size)
 
-    def forward(self, xs_user, sizes, last_city=None, date_month=None, affiliate_id=None):
+    def forward(self, xs_user, sizes, last_city=None, date_month=None, affiliate_id=None, countries=None):
         """
         :param xs_user: list of list -> each list represent the item_id of a user
         :param sizes: list(int) size of each list before padding
         :param last_city: Tensor([city_ids]) contains the last city of the user for each current trip
         :param date_month: Tensor([month_id])
         :param affiliate_id: Tensor([aff_ids])
+        :param countries: tensor(country_id)
         :return:
         """
         # During the training, we will look for the dot product btw user vector and all item vectors
-        item_indexes = torch.LongTensor(np.arange(self.embeddings_model.n_items))
-        item_embeddings = self.embeddings_model.embeddings(item_indexes)
+        item_indexes = torch.LongTensor(np.arange(self.n_cities))
+        item_embeddings = self.city_embeddings_model(item_indexes)
         final_item_embeddings = self.item_tower(item_embeddings)
 
         seq_sizes = torch.FloatTensor(sizes)
-        X = pad_sequence(xs_user, batch_first=False, padding_value=self.n_items)
-        user_embeddings = self.embeddings_model.embeddings(X)
+        X = pad_sequence(xs_user, batch_first=False, padding_value=self.n_cities)
+        user_embeddings = self.city_embeddings_model(X)
         user_batch = torch.sum(user_embeddings, dim=0) / seq_sizes.reshape(-1, 1)
 
         if last_city is not None:
-            last_city_embeddings = self.embeddings_model.embeddings(last_city)
+            last_city_embeddings = self.city_embeddings_model(last_city)
             user_batch = torch.cat([user_batch, last_city_embeddings], dim=1)
         if affiliate_id is not None:
             print("--->", torch.max(affiliate_id), self.n_affiliates)
@@ -68,7 +74,11 @@ class KnnLearner(pl.LightningModule):
         if date_month is not None:
             date_embedding = self.date_embedding(date_month)
             user_batch = torch.cat([user_batch, date_embedding], dim=1)
+        if countries is not None:
+            country_emb = self.country_embeddings_model(countries)
+            user_batch = torch.cat([user_batch, country_emb], dim=1)
 
+        print("userbatch size : ")
         user_features = self.user_tower(user_batch)
         scores = user_features @ final_item_embeddings.transpose(1, 0)
 
@@ -87,13 +97,14 @@ class KnnLearner(pl.LightningModule):
         (x, sizes, last_city, *other_features), y = batch
 
         try:
-            date_month, affiliate_batch = other_features
+            date_month, affiliate_batch, countries = other_features
         except Exception:
             print("Could not parse other features")
             date_month = None
             affiliate_batch = None
+            countries = None
 
-        scores = self.forward(x, sizes, last_city, date_month, None)
+        scores = self.forward(x, sizes, last_city, date_month, None, countries)
         loss = self.weighted_cross_entropy(F.softmax(scores, dim=1), torch.LongTensor(y))
         self.log('loss', loss)
         topk_matches = torch.sum(torch.topk(scores, k=4, dim=1).indices == y.reshape(-1, 1))
@@ -116,7 +127,7 @@ class KnnLearner(pl.LightningModule):
 
     def configure_optimizers(self):
         parameters = itertools.chain(
-            self.embeddings_model.embeddings.parameters(),
+            self.city_embeddings_model.parameters(),
             self.user_tower.parameters(),
             self.item_tower.parameters(),
             self.affiliate_embedding.parameters(),

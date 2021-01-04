@@ -30,10 +30,13 @@ class BookingSequenceDataModule(pl.LightningDataModule):
 
         # Some indexes may be missing, we need to reindex
         self.nb_cities = len(set(df.city_id))
+        self.nb_countries = len(set(df.hotel_country))
         self.index_to_cities = dict(enumerate(set(df.city_id)))
         self.cities_to_index = {v: k for k, v in self.index_to_cities.items()}
         self.index_to_affiliates = dict(enumerate(set(df.affiliate_id)))
         self.affiliate_to_index = {v: k for k, v in self.index_to_affiliates.items()}
+        self.index_to_countries = dict(enumerate(set(df.hotel_country)))
+        self.country_to_index = {v: k for k, v in self.index_to_countries.items()}
         country_per_city_tuples = dict(df.groupby(df.city_id).\
                                        agg({"hotel_country": "unique"}).\
                                        itertuples(index=True))
@@ -59,6 +62,7 @@ class BookingSequenceDataModule(pl.LightningDataModule):
     def build_df_features(self, df):
         df["city_id"] = df["city_id"].apply(lambda x: self.cities_to_index[x])
         df["affiliate_id"] = df["affiliate_id"].apply(lambda x: self.affiliate_to_index[x])
+        df["hotel_country"] = df["hotel_country"].apply(lambda x: self.country_to_index[x])
 
     @staticmethod
     def build_trip_features(df):
@@ -82,7 +86,8 @@ class BookingSequenceDataModule(pl.LightningDataModule):
             return data[:-1], data[-1]
 
         per_trip = df.groupby(df.utrip_id). \
-            agg({"city_id": split_feat_label, "checkout": get_booking_month, "affiliate_id": get_non_label})
+            agg({"city_id": split_feat_label, "checkout": get_booking_month,
+                 "affiliate_id": get_non_label, "hotel_country": get_non_label})
 
         return per_trip.itertuples(index=True)
 
@@ -92,7 +97,8 @@ class BookingSequenceDataModule(pl.LightningDataModule):
         cities, label = zip(*list(city_sequences))
         dates = map(lambda x: x.checkout, sequences)
         affiliate_ids = map(lambda x: x.affiliate_id[-1], sequences)
-        return cities, label, list(dates), list(affiliate_ids)
+        hotel_country = map(lambda x: x.hotel_country[-1], sequences)
+        return cities, label, list(dates), list(affiliate_ids), list(hotel_country)
 
     def my_collate(self, batch):
         """
