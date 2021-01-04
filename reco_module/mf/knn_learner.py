@@ -28,7 +28,7 @@ class KnnLearner(pl.LightningModule):
                                  lr=self.lr, embedding_size=embedding_size)
         self.n_items = n_items
 
-        entry_size = embedding_size * multiplier + emb_aff_size + emb_date_size
+        entry_size = embedding_size * multiplier + 0 * emb_aff_size + emb_date_size
         self.user_tower = nn.Sequential(*[nn.Linear(entry_size, layer_size[0]),
                                           nn.ReLU(),
                                           nn.Linear(layer_size[0], layer_size[1])])
@@ -93,7 +93,7 @@ class KnnLearner(pl.LightningModule):
             date_month = None
             affiliate_batch = None
 
-        scores = self.forward(x, sizes, last_city, date_month, affiliate_batch)
+        scores = self.forward(x, sizes, last_city, date_month, None)
         loss = self.weighted_cross_entropy(F.softmax(scores, dim=1), torch.LongTensor(y))
         self.log('loss', loss)
         topk_matches = torch.sum(torch.topk(scores, k=4, dim=1).indices == y.reshape(-1, 1))
