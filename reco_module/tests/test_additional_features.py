@@ -17,7 +17,6 @@ class TestDatasetRecoModelIntegration(TestCase):
         cls.embedding_size = 50
         cls.max_lines = 10000
 
-
         data_path = "/home/amor/Documents/code_dw/booking_challenge/data"
         cls.reco_dataset = BookingTripRecoDataModule(data_path, 256, max_rows=cls.max_lines)
         cls.reco_dataset.setup()
@@ -43,4 +42,4 @@ class TestDatasetRecoModelIntegration(TestCase):
         knn_learner = KnnLearner(self.n_items, self.save_path, self.embedding_size, 0.001, 
                                  nb_affiliates=len(self.dataset.index_to_affiliates))
         trainer = pl.Trainer(max_epochs=1, progress_bar_refresh_rate=20)
-        trainer.fit(knn_learner, self.dataset.train_dataloader())
+        trainer.fit(knn_learner, self.dataset.train_dataloader(), self.dataset.val_dataloader())
